@@ -1,0 +1,75 @@
+/* Enter styling in this page */
+img{
+    height: 300px;
+    width: 500px;
+    object-fit: cover;
+    border: 10px solid black;
+}
+
+ol{
+    display: inline-block;
+    list-style-position: inside;
+    text-align: center;
+    background-color: darkolivegreen;
+    color: whitesmoke;
+    padding-inline-end: 40px;
+    padding-bottom: 50px;
+    padding-top: 30px;
+}
+
+ul{
+    display: inline;
+    background-color: brown;
+    text-align: center;
+    color: white;
+    padding: 10px 20px;
+}
+
+body{
+    background-color: beige;
+    color: black;
+    font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+}
+
+.header{
+    color: rgb(51, 80, 1);
+    font-weight: bold;
+    text-align: center;
+    font-size: xx-large;
+    font-family: cursive;
+}
+
+.mainbody{
+    color: rgb(51, 80, 1);
+    text-align: center;
+    font-family: monospace;
+    font-size: larger ;
+}
+
+.video{
+    display: inline-block;
+    text-align: center;
+    background-color: rgb(155, 6, 6);
+    color: whitesmoke;
+    padding-inline: 50px;
+    padding-bottom: 50px;
+}
+
+nav{
+    background-color: olivedrab;
+    padding: 10px;
+    overflow: hidden;
+}
+
+nav a{
+    color: whitesmoke;
+    text-decoration: wavy;
+    padding: 15px;
+    font-weight: bold;
+    font-family: fantasy;
+}
+
+nav a{
+    background-color:rgb(51, 80, 1);
+}
+

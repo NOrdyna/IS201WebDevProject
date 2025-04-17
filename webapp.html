@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Simple Golf Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #87CEEB;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+
+        #game {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(#228B22, #006400);
+            cursor: crosshair;
+        }
+
+        #ball {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.1s ease;
+        }
+
+        #hole {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background: black;
+            border-radius: 50%;
+        }
+
+        #message {
+            position: absolute;
+            top: 20px;
+            width: 100%;
+            text-align: center;
+            color: lightblue;
+            font-size: 24px;
+            font-weight: bold;
+            pointer-events: none;
+        }
+
+        #wind {
+            position: absolute;
+            top: 60px;
+            width: 100%;
+            text-align: center;
+            color: lightblue;
+            font-size: 18px;
+            pointer-events: none;
+        }
+
+        .sand, .water {
+            position: absolute;
+            opacity: 0.8;
+            border-radius: 10px;
+        }
+
+        .sand {
+            background: #F4A261;
+        }
+
+        .water {
+            background: #1E90FF;
+            opacity: 0.6;
+        }
+
+        #target {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: red;
+            border-radius: 50%;
+            opacity: 0.5;
+            transition: opacity 0.5s;
+        }
+    </style>
+</head>
+<body>
+    <div id="game">
+        <div id="message">Click to hit the ball toward where you click!</div>
+        <div id="wind">Wind: 0, 0</div>
+        <div id="ball"></div>
+        <div id="hole"></div>
+        <div id="target" style="display: none;"></div>
+        <div class="sand"></div>
+        <div class="sand"></div>
+        <div class="sand"></div>
+        <div class="water"></div>
+        <div class="water"></div>
+        <div class="water"></div>
+        <div class="sand"></div>
+        <div class="water"></div>
+        <div class="sand"></div>
+        <div class="water"></div>
+        <div class="sand"></div>
+        <div class="water"></div>
+    </div>
+
+    <script>
+        class GolfGame {
+            constructor() {
+                this.game = document.getElementById('game');
+                this.ball = document.getElementById('ball');
+                this.hole = document.getElementById('hole');
+                this.message = document.getElementById('message');
+                this.windDisplay = document.getElementById('wind');
+                this.target = document.getElementById('target');
+                this.sandObstacles = document.querySelectorAll('.sand');
+                this.waterObstacles = document.querySelectorAll('.water');
+                this.ballX = 0;
+                this.ballY = 0;
+                this.holeX = 0;
+                this.holeY = 0;
+                this.inMotion = false;
+                this.strokes = 0;
+                this.par = this.getRandomPar();
+                this.windX = (Math.random() - 0.5) * 0.4;
+                this.windY = (Math.random() - 0.5) * 0.4;
+                this.rotation = 0;
+                this.obstacleRects = [];
+
+                this.init();
+            }
+
+            getRandomPar() {
+                return [3, 4, 5][Math.floor(Math.random() * 3)];
+            }
+
+            updateBallPosition() {
+                this.ball.style.left = `${this.ballX - 10}px`;
+                this.ball.style.top = `${this.ballY - 10}px`;
+                this.ball.style.transform = `rotate(${this.rotation}deg)`;
+            }
+
+            updateHolePosition() {
+                this.hole.style.left = `${this.holeX - 7.5}px`;
+                this.hole.style.top = `${this.holeY - 7.5}px`;
+            }
+
+            isBallInObstacle(x, y) {
+                for (let rect of this.obstacleRects) {
+                    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                        return { type: rect.type, rect };
+                    }
+                }
+                return null;
+            }
+
+            setInitialBallPosition() {
+                let valid = false;
+                while (!valid) {
+                    this.ballX = 50;
+                    this.ballY = Math.random() * (window.innerHeight - 20);
+                    valid = !this.isBallInObstacle(this.ballX, this.ballY);
+                }
+                this.updateBallPosition();
+            }
+
+            // Modified: Ensure hole is not in obstacles and is in a challenging position
+            setHolePosition() {
+                const minDistanceFromBall = Math.max(window.innerWidth, window.innerHeight) * 0.5; // At least 50% of screen size
+                const maxAttempts = 100; // Prevent infinite loops
+                let bestPosition = null;
+                let bestScore = -Infinity;
+
+                for (let i = 0; i < maxAttempts; i++) {
+                    const x = Math.random() * (window.innerWidth - 100) + 50;
+                    const y = Math.random() * (window.innerHeight - 100) + 50;
+
+                    // Check if position is valid (not in obstacles)
+                    let valid = true;
+                    for (let rect of this.obstacleRects) {
+                        // Add a 20px buffer around obstacles
+                        if (
+                            x >= rect.left - 20 &&
+                            x <= rect.right + 20 &&
+                            y >= rect.top - 20 &&
+                            y <= rect.bottom + 20
+                        ) {
+                            valid = false;
+                            break;
+                        }
+                    }
+
+                    // Check minimum distance from ball
+                    const distanceFromBall = Math.hypot(x - this.ballX, y - this.ballY);
+                    if (distanceFromBall < minDistanceFromBall) {
+                        valid = false;
+                    }
+
+                    if (valid) {
+                        // Evaluate position difficulty
+                        const score = this.evaluateHolePosition(x, y);
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestPosition = { x, y };
+                        }
+                    }
+                }
+
+                // Fallback: If no valid position found, place far from ball
+                if (!bestPosition) {
+                    bestPosition = {
+                        x: this.ballX + (window.innerWidth - 100) * (this.ballX < window.innerWidth / 2 ? 0.8 : -0.8),
+                        y: this.ballY + (window.innerHeight - 100) * (this.ballY < window.innerHeight / 2 ? 0.8 : -0.8),
+                    };
+                }
+
+                this.holeX = bestPosition.x;
+                this.holeY = bestPosition.y;
+                this.updateHolePosition();
+            }
+
+            // New: Evaluate hole position difficulty based on proximity to obstacles and distance from ball
+            evaluateHolePosition(x, y) {
+                let score = 0;
+
+                // Increase score for greater distance from ball
+                const distanceFromBall = Math.hypot(x - this.ballX, y - this.ballY);
+                score += distanceFromBall * 0.5;
+
+                // Increase score for proximity to obstacles (but not too close)
+                for (let rect of this.obstacleRects) {
+                    const centerX = (rect.left + rect.right) / 2;
+                    const centerY = (rect.top + rect.bottom) / 2;
+                    const distanceToObstacle = Math.hypot(x - centerX, y - centerY);
+                    if (distanceToObstacle < 100) {
+                        score += (100 - distanceToObstacle) * 2; // Higher score for closer obstacles
+                    }
+                }
+
+                return score;
+            }
+
+            placeObstacles() {
+                this.obstacleRects = [];
+                const allObstacles = [...this.sandObstacles, ...this.waterObstacles];
+                allObstacles.forEach((obs, i) => {
+                    let valid = false;
+                    let x, y, width, height;
+                    while (!valid) {
+                        x = Math.random() * (window.innerWidth - 200) + 100;
+                        y = Math.random() * (window.innerHeight - 200) + 100;
+                        width = 100 + Math.random() * 150;
+                        height = 50 + Math.random() * 100;
+                        valid = true;
+
+                        // Ensure obstacle is not too close to ball or hole
+                        if (
+                            Math.hypot(x - this.ballX, y - this.ballY) < 150 ||
+                            Math.hypot(x - this.holeX, y - this.holeY) < 100
+                        ) {
+                            valid = false;
+                            continue;
+                        }
+
+                        // Check for overlap with other obstacles
+                        for (let rect of this.obstacleRects) {
+                            if (
+                                x < rect.right &&
+                                x + width > rect.left &&
+                                y < rect.bottom &&
+                                y + height > rect.top
+                            ) {
+                                valid = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    obs.style.left = `${x}px`;
+                    obs.style.top = `${y}px`;
+                    obs.style.width = `${width}px`;
+                    obs.style.height = `${height}px`;
+                    this.obstacleRects.push({
+                        left: x,
+                        right: x + width,
+                        top: y,
+                        bottom: y + height,
+                        type: obs.classList.contains('sand') ? 'sand' : 'water',
+                    });
+                });
+            }
+
+            getScoreMessage(strokes) {
+                if (strokes === this.par) return 'Par! Nice job!';
+                if (strokes === this.par - 1) return 'Birdie!';
+                if (strokes === this.par - 2) return 'Eagle!';
+                if (strokes === this.par + 1) return 'Bogey!';
+                if (strokes === this.par + 2) return 'Double Bogey!';
+                if (strokes === this.par + 3) return 'Triple Bogey!';
+                if (strokes > this.par + 3) return 'Worse than Triple Bogey!';
+                return 'Nice Shot!';
+            }
+
+            resetGame() {
+                this.strokes = 0;
+                this.par = this.getRandomPar();
+                this.windX = (Math.random() - 0.5) * 0.4;
+                this.windY = (Math.random() - 0.5) * 0.4;
+                this.windDisplay.textContent = `Wind: ${this.windX.toFixed(2)}, ${this.windY.toFixed(2)}`;
+                this.setInitialBallPosition();
+                this.placeObstacles(); // Place obstacles before hole to ensure hole avoids them
+                this.setHolePosition();
+                this.message.textContent = `Click to hit the ball toward where you click! (Par: ${this.par})`;
+                this.inMotion = false;
+            }
+
+            checkHole() {
+                const distance = Math.hypot(this.ballX - this.holeX, this.ballY - this.holeY);
+                return distance < 10;
+            }
+
+            showTarget(x, y) {
+                this.target.style.left = `${x - 5}px`;
+                this.target.style.top = `${y - 5}px`;
+                this.target.style.display = 'block';
+                this.target.style.opacity = '0.5';
+                setTimeout(() => {
+                    this.target.style.opacity = '0';
+                    setTimeout(() => {
+                        this.target.style.display = 'none';
+                    }, 500);
+                }, 500);
+            }
+
+            handleClick(e) {
+                if (this.inMotion) return;
+
+                const targetX = e.clientX;
+                const targetY = e.clientY;
+                this.showTarget(targetX, targetY);
+
+                const dx = targetX - this.ballX;
+                const dy = targetY - this.ballY;
+                const distance = Math.hypot(dx, dy);
+                const steps = Math.min(30, Math.floor(distance / 10));
+                let stepX = dx / steps;
+                let stepY = dy / steps;
+                const stepRotation = Math.atan2(dy, dx) * (180 / Math.PI) / steps;
+
+                this.strokes++;
+                this.message.textContent = `Stroke ${this.strokes}... (Par: ${this.par})`;
+                this.inMotion = true;
+
+                let count = 0;
+                const interval = setInterval(() => {
+                    this.ballX += stepX + this.windX;
+                    this.ballY += stepY + this.windY;
+                    this.rotation += stepRotation;
+
+                    const obstacle = this.isBallInObstacle(this.ballX, this.ballY);
+                    if (obstacle) {
+                        if (obstacle.type === 'sand') {
+                            stepX *= 0.4;
+                            stepY *= 0.4;
+                        } else if (obstacle.type === 'water') {
+                            clearInterval(interval);
+                            this.strokes++;
+                            this.message.textContent = `💧 Hit water! Ball reset. +1 Stroke. Stroke ${this.strokes} (Par: ${this.par})`;
+                            this.setInitialBallPosition();
+                            this.inMotion = false;
+                            return;
+                        }
+                    }
+
+                    this.updateBallPosition();
+                    count++;
+
+                    if (this.checkHole()) {
+                        clearInterval(interval);
+                        const scoreMessage = this.getScoreMessage(this.strokes);
+                        this.message.textContent = `🏌️ You sank it in ${this.strokes} stroke${this.strokes > 1 ? 's' : ''}! ${scoreMessage}`;
+                        setTimeout(() => this.resetGame(), 2000);
+                        return;
+                    }
+
+                    if (count >= steps) {
+                        clearInterval(interval);
+                        this.message.textContent = `😬 Missed! Stroke ${this.strokes} (Par: ${this.par}). Click again to try.`;
+                        this.inMotion = false;
+                    }
+                }, 20);
+            }
+
+            handleResize() {
+                this.resetGame();
+            }
+
+            init() {
+                this.resetGame();
+                this.game.addEventListener('click', (e) => this.handleClick(e));
+                window.addEventListener('resize', () => this.handleResize());
+            }
+        }
+
+        new GolfGame();
+    </script>
+</body>
+</html>
